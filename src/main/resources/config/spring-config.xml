@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- Redis配置 -->
+    <bean id="poolConfig" class="redis.clients.jedis.JedisPoolConfig">
+        <!--最大空闲数 -->
+        <property name="maxIdle" value="50" />
+        <!--最大连接数 -->
+        <property name="maxTotal" value="100" />
+        <!--最大等待时间 -->
+        <property name="maxWaitMillis" value="20000" />
+    </bean>
+
+    <!-- Redis链接管理 -->
+    <bean class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory" id="connectionFactory">
+        <property name="hostName" value="127.0.0.1"/>
+        <property name="port" value="6379"/>
+        <!--<property name="password" value="password"/>-->
+        <property name="poolConfig" ref="poolConfig"/>
+     </bean>
+
+
+    <bean class="org.springframework.data.redis.serializer.JdkSerializationRedisSerializer" id="jdkSerializationRedisSerializer" />
+
+    <bean class="org.springframework.data.redis.serializer.StringRedisSerializer" id="stringRedisSerializer"/>
+
+    <!-- 配置Redis操作类-->
+    <bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate">
+        <property name="connectionFactory" ref="connectionFactory" />
+        <!-- 值序列器 -->
+        <property name="keySerializer" ref="stringRedisSerializer" />
+        <!-- 键序列器 -->
+        <!--<property name="valueSerializer" ref="jdkSerializationRedisSerializer" />-->
+
+        <property name="valueSerializer" ref="stringRedisSerializer"/>
+
+        <property name="defaultSerializer" ref="jdkSerializationRedisSerializer"/>
+    </bean>
+
+    <!-- 订阅消息监听器 自定义 -->
+    <bean id="redisMsgListener" class="com.spring.listener.RedisMessageListener">
+        <property name="redisTemplate" ref="redisTemplate" />
+    </bean>
+    <!-- jdkSerializationRedisSerializer -->
+    <bean id="redisMsgListener2" class="com.spring.listener.RedisMessageListener2">
+        <property name="redisTemplate" ref="redisTemplate" />
+    </bean>
+
+    <!-- 消息监听器容器 -->
+    <bean id="topicContainer" class="org.springframework.data.redis.listener.RedisMessageListenerContainer"
+          destroy-method="destroy">
+        <!--Redis连接工厂 -->
+        <property name="connectionFactory" ref="connectionFactory" />
+        <!--连接池，这里只要线程池生存，才能继续监听 -->
+        <property name="taskExecutor">
+            <bean class="org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler">
+                <property name="poolSize" value="2" />
+            </bean>
+        </property>
+        <!--消息监听Map -->
+        <property name="messageListeners">
+            <map>
+                <!--配置监听者，key-ref和bean id定义一致 -->
+                <entry key-ref="redisMsgListener">
+                    <!--监听类 -->
+                    <bean class="org.springframework.data.redis.listener.ChannelTopic">
+                        <!-- 监听频道 -->
+                        <constructor-arg value="chat"/>
+                    </bean>
+                </entry>
+                <!--配置监听者，key-ref和bean id定义一致 -->
+                <entry key-ref="redisMsgListener2">
+                    <!--监听类 -->
+                    <bean class="org.springframework.data.redis.listener.ChannelTopic">
+                        <!-- 监听频道 -->
+                        <constructor-arg value="channel"/>
+                    </bean>
+                </entry>
+            </map>
+        </property>
+    </bean>
+
+   <!-- &lt;!&ndash;哨兵配置 &ndash;&gt;
+    <bean id="sentinelConfig"
+          class="org.springframework.data.redis.connection.RedisSentinelConfiguration">
+        &lt;!&ndash;服务名称 &ndash;&gt;
+        <property name="master">
+            <bean class="org.springframework.data.redis.connection.RedisNode">
+                <property name="name" value="mymaster" />
+            </bean>
+        </property>
+        &lt;!&ndash;哨兵服务IP和端口 &ndash;&gt;
+        <property name="sentinels">
+            <set>
+                <bean class="org.springframework.data.redis.connection.RedisNode">
+                    <constructor-arg name="host" value="192.168.11.128" />
+                    <constructor-arg name="port" value="26379" />
+                </bean>
+                <bean class="org.springframework.data.redis.connection.RedisNode">
+                    <constructor-arg name="host" value="192.168.11.129" />
+                    <constructor-arg name="port" value="26379" />
+                </bean>
+                <bean class="org.springframework.data.redis.connection.RedisNode">
+                    <constructor-arg name="host" value="192.168.11.130" />
+                    <constructor-arg name="port" value="26379" />
+                </bean>
+            </set>
+        </property>
+    </bean>-->
+</beans>
